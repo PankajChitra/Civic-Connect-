@@ -1,0 +1,99 @@
+/* ========== Global Reset & Defaults ========== */
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+/* ========== CSS Variables ========== */
+:root {
+  --primary-color: #2563eb;
+  --primary-hover: #1e40af;
+  --bg-color: #f9fafb;
+  --text-color: #1f2937;
+  --border-color: #e5e7eb;
+  --radius: 0.75rem;
+  --shadow: 0 4px 10px rgba(0, 0, 0, 0.08);
+  --transition: all 0.3s ease;
+}
+
+/* ========== Base Styles ========== */
+html, body {
+  font-family: "Poppins", "Segoe UI", Roboto, sans-serif;
+  background-color: var(--bg-color);
+  color: var(--text-color);
+  min-height: 100%;
+  scroll-behavior: smooth;
+}
+
+/* Remove link underline & apply transition */
+a {
+  text-decoration: none;
+  color: inherit;
+  transition: var(--transition);
+}
+
+a:hover {
+  color: var(--primary-color);
+}
+
+/* ========== Utility Classes ========== */
+.container {
+  width: 90%;
+  max-width: 1200px;
+  margin: 0 auto;
+}
+
+/* Button defaults */
+button {
+  cursor: pointer;
+  font-family: inherit;
+  transition: var(--transition);
+}
+
+/* Form elements */
+input, textarea, select {
+  font-family: inherit;
+  font-size: 0.95rem;
+  color: var(--text-color);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius);
+  padding: 0.6rem;
+  width: 100%;
+  outline: none;
+  background-color: #fff;
+  transition: border-color 0.3s ease;
+}
+
+input:focus,
+textarea:focus,
+select:focus {
+  border-color: var(--primary-color);
+}
+
+/* Headings */
+h1, h2, h3 {
+  color: var(--text-color);
+  font-weight: 600;
+}
+
+/* Images and videos */
+img, video {
+  display: block;
+  max-width: 100%;
+  border-radius: var(--radius);
+}
+
+/* Scrollbar (optional aesthetic tweak) */
+::-webkit-scrollbar {
+  width: 8px;
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--primary-color);
+  border-radius: 10px;
+}
+
+::-webkit-scrollbar-track {
+  background: #f1f1f1;
+}

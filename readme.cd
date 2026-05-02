@@ -1,0 +1,131 @@
+# CivicConnect v2 — Setup Guide
+
+## Prerequisites
+- Node.js 18+  →  https://nodejs.org
+- A free MongoDB Atlas account  →  https://cloud.mongodb.com
+
+---
+
+## Step 1 — MongoDB Atlas setup (one time)
+
+1. Sign in at cloud.mongodb.com
+2. Create a free **M0** cluster
+3. **Database Access** → Add Database User → username + password → Read/Write
+4. **Network Access** → Add IP Address → **0.0.0.0/0** (allow all, fine for dev)
+5. **Connect** → Drivers → copy the connection string (looks like `mongodb+srv://...`)
+
+---
+
+## Step 2 — Backend setup
+
+```bash
+cd Backend
+
+# 1. Install dependencies
+npm install
+
+# 2. Create your .env file
+cp .env.example .env
+```
+
+Open `Backend/.env` and fill in **two** things:
+```
+MONGO_URI=mongodb+srv://youruser:yourpassword@yourcluster.mongodb.net/civicconnect?retryWrites=true&w=majority
+JWT_SECRET=any_long_random_string_at_least_32_characters
+```
+Everything else can stay as-is.
+
+```bash
+# 3. Start the backend
+npm run dev
+```
+You should see:
+```
+Server running on http://localhost:5000 🚀
+MongoDB Connected: yourcluster.mongodb.net ✅
+```
+
+---
+
+## Step 3 — Frontend setup
+
+```bash
+cd Frontend
+
+# 1. Install dependencies
+npm install
+
+# 2. Start the frontend  (no .env changes needed)
+npm run dev
+```
+
+Open **http://localhost:5173** in your browser.
+
+> ✅ The frontend automatically talks to the backend through Vite's proxy.
+> You do NOT need to change any URLs — it works on any machine.
+
+---
+
+## Step 4 — Create your first admin
+
+1. Open http://localhost:5173 → Sign Up → create an account
+2. Go to **MongoDB Atlas** → Browse Collections → **users** collection
+3. Find your document → click Edit → change:
+   ```json
+   "role": "admin",
+   "adminLevel": 3,
+   "city": "Your City"
+   ```
+4. Save → log out of the app → log back in
+5. You now have City Admin (Level 3) access
+
+---
+
+## Both terminals at once
+
+```
+Terminal 1          Terminal 2
+──────────          ──────────
+cd Backend          cd Frontend
+npm run dev         npm run dev
+```
+
+---
+
+## Troubleshooting
+
+| Problem | Fix |
+|---------|-----|
+| `Failed to fetch` on login | Make sure backend is running on port 5000 |
+| `MongoServerError` | Check your MONGO_URI in Backend/.env |
+| `EADDRINUSE 5000` | Kill the process: `npx kill-port 5000` |
+| `EADDRINUSE 5173` | Kill the process: `npx kill-port 5173` |
+| Issues load but login fails | Hard-refresh the browser (Ctrl+Shift+R) |
+| Vite can't find modules | Delete `node_modules` and run `npm install` again |
+
+---
+
+## Project structure
+
+```
+CivicConnect/
+├── Backend/
+│   ├── .env.example     ← copy to .env and fill in MONGO_URI + JWT_SECRET
+│   ├── server.js
+│   ├── models/          ← User.js, Issue.js
+│   ├── controllers/     ← authController.js, issueController.js
+│   ├── routes/          ← authRoutes.js, issueRoutes.js
+│   ├── middleware/       ← authMiddleware.js
+│   └── services/        ← escalationService.js (auto-escalation cron)
+│
+└── Frontend/
+    ├── vite.config.js   ← proxy: /api → localhost:5000 (no URL changes needed)
+    ├── .env             ← VITE_API_URL=/api  (relative, works everywhere)
+    └── src/
+        ├── pages/       ← HomePage, ReportPage, IssuesPage, AdminPage…
+        ├── components/  ← IssueCard, Navbar, MapPicker…
+        ├── context/     ← AuthContext, IssueContext
+        ├── hooks/       ← useIssueForm
+        ├── services/    ← api.js (all fetch calls)
+        └── constants/   ← categories, thresholds, style maps
+```

@@ -1,5 +1,22 @@
 const Issue = require("../models/Issue");
 
+// ── Upvote thresholds → priority upgrade (keep in sync with frontend constants)
+const UPVOTE_THRESHOLDS = [
+  { min: 50, priority: "Critical" },
+  { min: 25, priority: "High"     },
+  { min: 10, priority: "Medium"   },
+];
+
+// Returns the priority that should apply given an upvote count
+const calcPriority = (upvotes, current) => {
+  for (const t of UPVOTE_THRESHOLDS) {
+    if (upvotes >= t.min) return t.priority;
+  }
+  // Below all thresholds — don't downgrade if admin already set it higher
+  const order = ["Low", "Medium", "High", "Critical"];
+  return order.indexOf(current) >= 0 ? current : "Low";
+};
+
 // ── GET /api/issues ───────────────────────────────────────────────────────────
 const getIssues = async (req, res, next) => {
   try {
@@ -13,15 +30,15 @@ const getIssues = async (req, res, next) => {
     const skip = (Number(page) - 1) * Number(limit);
     const [issues, total] = await Promise.all([
       Issue.find(filter)
-        .sort({ priority: -1, createdAt: -1 })
+        .sort({ upvotes: -1, createdAt: -1 })   // hot issues first
         .skip(skip).limit(Number(limit))
-        .populate("reportedBy", "name email")
+        .populate("reportedBy", "name")
         .populate("assignedTo", "name email adminLevel ward district"),
       Issue.countDocuments(filter),
     ]);
 
-    res.json({ success: true, total, page: Number(page),
-      pages: Math.ceil(total / Number(limit)), issues });
+    res.json({ success: true, total,
+      page: Number(page), pages: Math.ceil(total / Number(limit)), issues });
   } catch (err) { next(err); }
 };
 
@@ -38,7 +55,7 @@ const getIssueById = async (req, res, next) => {
   } catch (err) { next(err); }
 };
 
-// ── POST /api/issues ──────────────────────────────────────────────────────────
+// ── POST /api/issues  (login required — enforced in route) ────────────────────
 const createIssue = async (req, res, next) => {
   try {
     const { title, description, category, locationText,
@@ -48,17 +65,18 @@ const createIssue = async (req, res, next) => {
       title, description, category, locationText,
       locationCoords: locationCoords || null,
       media: media || [],
-      ward: ward || req.user?.ward || "",
+      ward:     ward     || req.user?.ward     || "",
       district: district || req.user?.district || "",
-      reportedBy: req.user?._id || null,
+      reportedBy:    req.user._id,   // guaranteed logged-in via protect middleware
       lastActivityAt: new Date(),
+      priority: "Low",               // always starts Low; upvotes will raise it
     });
 
     res.status(201).json({ success: true, issue });
   } catch (err) { next(err); }
 };
 
-// ── PATCH /api/issues/:id/status  (admin, must match or exceed currentLevel) ──
+// ── PATCH /api/issues/:id/status ─────────────────────────────────────────────
 const updateStatus = async (req, res, next) => {
   try {
     const { status, comment } = req.body;
@@ -69,21 +87,16 @@ const updateStatus = async (req, res, next) => {
     const issue = await Issue.findById(req.params.id);
     if (!issue) return res.status(404).json({ success: false, message: "Issue not found" });
 
-    // Level check
     if (req.user.adminLevel < issue.currentLevel)
       return res.status(403).json({
         success: false,
         message: `Issue is at level ${issue.currentLevel}. Your level (${req.user.adminLevel}) cannot act on it.`,
       });
 
-    issue.status = status;
+    issue.status         = status;
     issue.lastActivityAt = new Date();
     if (status === "Resolved") issue.resolvedBy = req.user._id;
-
-    // Attach optional comment
-    if (comment?.trim()) {
-      issue.comments.push({ author: req.user._id, text: comment.trim() });
-    }
+    if (comment?.trim()) issue.comments.push({ author: req.user._id, text: comment.trim() });
 
     await issue.save();
     await issue.populate("assignedTo", "name email adminLevel");
@@ -91,17 +104,16 @@ const updateStatus = async (req, res, next) => {
   } catch (err) { next(err); }
 };
 
-// ── PATCH /api/issues/:id/assign  (admin) ─────────────────────────────────────
+// ── PATCH /api/issues/:id/assign ─────────────────────────────────────────────
 const assignIssue = async (req, res, next) => {
   try {
     const { adminId } = req.body;
     const issue = await Issue.findById(req.params.id);
     if (!issue) return res.status(404).json({ success: false, message: "Issue not found" });
-
     if (req.user.adminLevel < issue.currentLevel)
       return res.status(403).json({ success: false, message: "Insufficient level to assign" });
 
-    issue.assignedTo    = adminId || null;
+    issue.assignedTo     = adminId || null;
     issue.lastActivityAt = new Date();
     await issue.save();
     await issue.populate("assignedTo", "name email adminLevel ward district");
@@ -109,16 +121,14 @@ const assignIssue = async (req, res, next) => {
   } catch (err) { next(err); }
 };
 
-// ── POST /api/issues/:id/escalate  (admin or auto-cron) ───────────────────────
+// ── POST /api/issues/:id/escalate ────────────────────────────────────────────
 const escalateIssue = async (req, res, next) => {
   try {
     const { reason = "Manually escalated" } = req.body;
     const issue = await Issue.findById(req.params.id);
     if (!issue) return res.status(404).json({ success: false, message: "Issue not found" });
-
     if (issue.currentLevel >= 3)
       return res.status(400).json({ success: false, message: "Already at highest level (City)" });
-
     if (req.user && req.user.adminLevel < issue.currentLevel)
       return res.status(403).json({ success: false, message: "Insufficient level to escalate" });
 
@@ -126,24 +136,66 @@ const escalateIssue = async (req, res, next) => {
     const toLevel   = fromLevel + 1;
 
     issue.escalationHistory.push({
-      fromLevel,
-      toLevel,
-      reason,
+      fromLevel, toLevel, reason,
       escalatedBy: req.user?._id || null,
       escalatedAt: new Date(),
     });
-
-    issue.currentLevel    = toLevel;
-    issue.status          = "Escalated";
-    issue.assignedTo      = null;         // clear assignment — new level picks it up
-    issue.lastActivityAt  = new Date();
+    issue.currentLevel   = toLevel;
+    issue.status         = "Escalated";
+    issue.assignedTo     = null;
+    issue.lastActivityAt = new Date();
 
     await issue.save();
     res.json({ success: true, issue, message: `Issue escalated to level ${toLevel}` });
   } catch (err) { next(err); }
 };
 
-// ── POST /api/issues/:id/comment ──────────────────────────────────────────────
+// ── POST /api/issues/:id/upvote  (logged-in citizens) ────────────────────────
+const upvoteIssue = async (req, res, next) => {
+  try {
+    const issue = await Issue.findById(req.params.id);
+    if (!issue) return res.status(404).json({ success: false, message: "Issue not found" });
+
+    // Cannot upvote your own issue
+    if (issue.reportedBy?.toString() === req.user._id.toString())
+      return res.status(400).json({ success: false, message: "You cannot upvote your own issue" });
+
+    const voted = issue.upvotedBy.includes(req.user._id);
+    if (voted) {
+      issue.upvotedBy.pull(req.user._id);
+      issue.upvotes = Math.max(0, issue.upvotes - 1);
+    } else {
+      issue.upvotedBy.push(req.user._id);
+      issue.upvotes += 1;
+    }
+
+    // ── Auto-upgrade priority based on upvote count ───────────────────────────
+    const newPriority = calcPriority(issue.upvotes, issue.priority);
+    const priorityChanged = newPriority !== issue.priority;
+    if (priorityChanged) {
+      issue.priority = newPriority;
+      issue.lastActivityAt = new Date();
+
+      // Log the auto-upgrade as a system comment
+      issue.comments.push({
+        author:    null,
+        text:      `🔺 Priority automatically upgraded to ${newPriority} after reaching ${issue.upvotes} upvotes.`,
+        createdAt: new Date(),
+      });
+    }
+
+    await issue.save();
+    res.json({
+      success: true,
+      upvotes: issue.upvotes,
+      voted: !voted,
+      priority: issue.priority,
+      priorityChanged,
+    });
+  } catch (err) { next(err); }
+};
+
+// ── POST /api/issues/:id/comment ─────────────────────────────────────────────
 const addComment = async (req, res, next) => {
   try {
     const { text } = req.body;
@@ -161,7 +213,7 @@ const addComment = async (req, res, next) => {
   } catch (err) { next(err); }
 };
 
-// ── PATCH /api/issues/:id/priority  (admin) ───────────────────────────────────
+// ── PATCH /api/issues/:id/priority ───────────────────────────────────────────
 const setPriority = async (req, res, next) => {
   try {
     const { priority } = req.body;
@@ -192,25 +244,6 @@ const deleteAllIssues = async (req, res, next) => {
   try {
     await Issue.deleteMany({});
     res.json({ success: true, message: "All issues deleted" });
-  } catch (err) { next(err); }
-};
-
-// ── POST /api/issues/:id/upvote ───────────────────────────────────────────────
-const upvoteIssue = async (req, res, next) => {
-  try {
-    const issue = await Issue.findById(req.params.id);
-    if (!issue) return res.status(404).json({ success: false, message: "Issue not found" });
-
-    const voted = issue.upvotedBy.includes(req.user._id);
-    if (voted) {
-      issue.upvotedBy.pull(req.user._id);
-      issue.upvotes = Math.max(0, issue.upvotes - 1);
-    } else {
-      issue.upvotedBy.push(req.user._id);
-      issue.upvotes += 1;
-    }
-    await issue.save();
-    res.json({ success: true, upvotes: issue.upvotes, voted: !voted });
   } catch (err) { next(err); }
 };
 

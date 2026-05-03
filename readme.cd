@@ -1,131 +1,327 @@
-# CivicConnect v2 — Setup Guide
+<div align="center">
 
-## Prerequisites
-- Node.js 18+  →  https://nodejs.org
-- A free MongoDB Atlas account  →  https://cloud.mongodb.com
+# 🏘️ CivicConnect
 
----
-
-## Step 1 — MongoDB Atlas setup (one time)
-
-1. Sign in at cloud.mongodb.com
-2. Create a free **M0** cluster
-3. **Database Access** → Add Database User → username + password → Read/Write
-4. **Network Access** → Add IP Address → **0.0.0.0/0** (allow all, fine for dev)
-5. **Connect** → Drivers → copy the connection string (looks like `mongodb+srv://...`)
+**A community-powered civic issue tracker that connects citizens with local authorities through a transparent, accountable, and escalating governance pipeline.**
 
 ---
 
-## Step 2 — Backend setup
+[🚀 Live Demo](https://civic-connect-ochre.vercel.app) &nbsp;·&nbsp;
+[🔌 API](https://civic-connect-4w0n.onrender.com) &nbsp;·&nbsp;
+[📋 Features](#-features) &nbsp;·&nbsp;
+[🛠️ Tech Stack](#️-tech-stack) &nbsp;·&nbsp;
+[⚡ Quick Start](#-quick-start) &nbsp;·&nbsp;
+[🗺️ API Reference](#️-api-reference)
 
-```bash
-cd Backend
+</div>
 
-# 1. Install dependencies
-npm install
+---
 
-# 2. Create your .env file
-cp .env.example .env
-```
+## 📌 What is CivicConnect?
 
-Open `Backend/.env` and fill in **two** things:
-```
-MONGO_URI=mongodb+srv://youruser:yourpassword@yourcluster.mongodb.net/civicconnect?retryWrites=true&w=majority
-JWT_SECRET=any_long_random_string_at_least_32_characters
-```
-Everything else can stay as-is.
+CivicConnect is a full-stack MERN application that lets registered citizens report local civic issues — potholes, broken streetlights, overflowing drains — and rally their community to upvote them. The more upvotes an issue gets, the higher its priority climbs automatically. If authorities don't act within a set time window, the issue auto-escalates up a 3-tier admin hierarchy (Ward → District → City), ensuring no report gets buried.
 
-```bash
-# 3. Start the backend
-npm run dev
+### The problem it solves
+
+Traditional civic complaint systems are black boxes — you file a complaint and never hear back. CivicConnect makes the entire pipeline transparent: every status change, every escalation, every assignment is visible to the public in real time.
+
+---
+
+## ✨ Features
+
+### For Citizens
+- 🔐 **Verified accounts only** — sign up with ward/district to route reports correctly, no anonymous spam
+- 📍 **Rich issue reporting** — 15 categories, manual address + interactive map pin, photo/video uploads
+- 👍 **Community upvoting** — upvote issues you care about (cannot upvote your own)
+- 📊 **Auto priority upgrade by votes** — 10 votes → Medium · 25 → High · 50 → Critical
+- 🔺 **Full escalation history** — see exactly when and why an issue moved up the chain
+- 🗺️ **Live map view** — all issues pinned on an interactive map with colour-coded markers
+- 🔥 **Hot / New / Critical sort** — surface the most urgent issues instantly
+
+### For Admins — 3-tier hierarchy
+
+| Level | Role | Can act on | Extra powers |
+|-------|------|-----------|--------------|
+| **L1** | Ward Admin | L1 issues in their ward | — |
+| **L2** | District Admin | L1 + L2 issues | Promote L1 admins, delete issues |
+| **L3** | City Admin | All issues | Promote anyone, full control |
+
+- 🎚️ **Level-aware dashboard** — each admin only sees what's in their jurisdiction
+- ✅ **Status updates** + internal comments visible to citizens
+- 🔧 **Issue assignment** to specific admins
+- ⏱️ **Auto-escalation cron** — idle issues escalate automatically
+  - Ward → District after 48 h idle (Critical issues escalate at 0.5× → 24 h)
+  - District → City after 72 h idle
+- 👥 **Team management panel** — promote/demote users from the dashboard
+
+---
+
+## 🛠️ Tech Stack
+
+### Frontend
+| Technology | Purpose |
+|-----------|---------|
+| **React 19** + Vite | UI framework + dev server with `/api` proxy |
+| **React Router v6** | Client-side routing |
+| **Framer Motion** | Animations |
+| **Leaflet** + React-Leaflet | Interactive maps |
+| **Context API** | Global state — `AuthContext`, `IssueContext` |
+| **Custom hooks** | `useIssueForm` encapsulates all form logic |
+| **Vercel** | Hosting + CDN |
+
+### Backend
+| Technology | Purpose |
+|-----------|---------|
+| **Node.js** + **Express** | REST API server |
+| **MongoDB** + **Mongoose** | Database + ODM |
+| **bcryptjs** | Password hashing |
+| **jsonwebtoken** | JWT authentication |
+| **setInterval cron** | Auto-escalation background job |
+| **Render** | Hosting |
+
+### Architecture
 ```
-You should see:
-```
-Server running on http://localhost:5000 🚀
-MongoDB Connected: yourcluster.mongodb.net ✅
+Frontend (MVC-inspired)
+├── pages/       → Controllers  (smart, read context, call hooks)
+├── components/  → Views        (pure UI — props in, JSX out, no API calls)
+├── context/     → Global state (AuthContext, IssueContext)
+├── hooks/       → Reusable logic
+└── services/    → API layer    (all fetch() calls isolated here)
 ```
 
 ---
 
-## Step 3 — Frontend setup
-
-```bash
-cd Frontend
-
-# 1. Install dependencies
-npm install
-
-# 2. Start the frontend  (no .env changes needed)
-npm run dev
-```
-
-Open **http://localhost:5173** in your browser.
-
-> ✅ The frontend automatically talks to the backend through Vite's proxy.
-> You do NOT need to change any URLs — it works on any machine.
-
----
-
-## Step 4 — Create your first admin
-
-1. Open http://localhost:5173 → Sign Up → create an account
-2. Go to **MongoDB Atlas** → Browse Collections → **users** collection
-3. Find your document → click Edit → change:
-   ```json
-   "role": "admin",
-   "adminLevel": 3,
-   "city": "Your City"
-   ```
-4. Save → log out of the app → log back in
-5. You now have City Admin (Level 3) access
-
----
-
-## Both terminals at once
-
-```
-Terminal 1          Terminal 2
-──────────          ──────────
-cd Backend          cd Frontend
-npm run dev         npm run dev
-```
-
----
-
-## Troubleshooting
-
-| Problem | Fix |
-|---------|-----|
-| `Failed to fetch` on login | Make sure backend is running on port 5000 |
-| `MongoServerError` | Check your MONGO_URI in Backend/.env |
-| `EADDRINUSE 5000` | Kill the process: `npx kill-port 5000` |
-| `EADDRINUSE 5173` | Kill the process: `npx kill-port 5173` |
-| Issues load but login fails | Hard-refresh the browser (Ctrl+Shift+R) |
-| Vite can't find modules | Delete `node_modules` and run `npm install` again |
-
----
-
-## Project structure
+## 📁 Project Structure
 
 ```
 CivicConnect/
+├── README.md
 ├── Backend/
-│   ├── .env.example     ← copy to .env and fill in MONGO_URI + JWT_SECRET
 │   ├── server.js
-│   ├── models/          ← User.js, Issue.js
-│   ├── controllers/     ← authController.js, issueController.js
-│   ├── routes/          ← authRoutes.js, issueRoutes.js
-│   ├── middleware/       ← authMiddleware.js
-│   └── services/        ← escalationService.js (auto-escalation cron)
+│   ├── .env.example
+│   ├── config/db.js
+│   ├── models/
+│   │   ├── User.js          # role, adminLevel (0-3), ward, district, city
+│   │   └── Issue.js         # category, status, priority, currentLevel,
+│   │                        #   upvotes, escalationHistory[], comments[]
+│   ├── controllers/
+│   │   ├── authController.js
+│   │   └── issueController.js   # upvote auto-upgrades priority
+│   ├── middleware/
+│   │   └── authMiddleware.js    # protect, adminOnly, levelGuard(n)
+│   ├── routes/
+│   │   ├── authRoutes.js
+│   │   └── issueRoutes.js
+│   └── services/
+│       └── escalationService.js # setInterval cron
 │
 └── Frontend/
-    ├── vite.config.js   ← proxy: /api → localhost:5000 (no URL changes needed)
-    ├── .env             ← VITE_API_URL=/api  (relative, works everywhere)
+    ├── vite.config.js       # proxy: /api → localhost:5000
+    ├── vercel.json          # SPA rewrite rules
+    ├── .env                 # VITE_API_URL=/api (dev) or full URL (prod)
     └── src/
-        ├── pages/       ← HomePage, ReportPage, IssuesPage, AdminPage…
-        ├── components/  ← IssueCard, Navbar, MapPicker…
-        ├── context/     ← AuthContext, IssueContext
-        ├── hooks/       ← useIssueForm
-        ├── services/    ← api.js (all fetch calls)
-        └── constants/   ← categories, thresholds, style maps
+        ├── constants/       # Categories, thresholds, style maps
+        ├── services/api.js  # authAPI + issueAPI
+        ├── context/         # AuthContext, IssueContext
+        ├── hooks/           # useIssueForm
+        ├── components/      # Navbar, IssueCard, MapPicker, AllIssuesMap…
+        └── pages/           # HomePage, ReportPage, IssuesPage,
+                             #   AdminPage, SignupPage, MapPage…
 ```
+
+---
+
+## ⚡ Quick Start
+
+### Prerequisites
+- Node.js 18+
+- Free [MongoDB Atlas](https://cloud.mongodb.com) account
+
+### 1 — Clone
+```bash
+git clone https://github.com/yourusername/civicconnect.git
+cd civicconnect
+```
+
+### 2 — Backend
+```bash
+cd Backend
+npm install
+cp .env.example .env
+```
+
+Edit `Backend/.env` — fill in **two things only**:
+```env
+MONGO_URI=mongodb+srv://<user>:<pass>@<cluster>.mongodb.net/civicconnect?retryWrites=true&w=majority
+JWT_SECRET=any_random_string_min_32_characters
+```
+
+```bash
+npm run dev
+# Server running on http://localhost:5000 🚀
+# MongoDB Connected ✅
+```
+
+### 3 — Frontend
+```bash
+cd ../Frontend
+npm install
+npm run dev
+# http://localhost:5173
+```
+
+> ✅ No URL configuration needed. The Vite proxy forwards all `/api/*` calls to the backend automatically — works on every machine out of the box.
+
+### 4 — Create your first admin
+
+1. Sign up at `http://localhost:5173`
+2. Open **MongoDB Atlas** → Collections → `users` → find your document → Edit:
+```json
+{
+  "role": "admin",
+  "adminLevel": 3,
+  "city": "Your City"
+}
+```
+3. Log out and log back in → you're now **City Admin (L3)**
+
+---
+
+## 🚀 Deployment
+
+### Backend on Render
+| Setting | Value |
+|---------|-------|
+| Build Command | `npm install` |
+| Start Command | `npm start` |
+| Env vars | `MONGO_URI`, `JWT_SECRET`, `NODE_ENV=production`, `CLIENT_URL=https://your-app.vercel.app` |
+
+### Frontend on Vercel
+| Setting | Value |
+|---------|-------|
+| Framework | Vite |
+| Build Command | `npm run build` |
+| Output Directory | `dist` |
+| Env var | `VITE_API_URL=https://civic-connect-4w0n.onrender.com/api` |
+
+Add `Frontend/vercel.json` for SPA routing:
+```json
+{
+  "rewrites": [{ "source": "/(.*)", "destination": "/index.html" }]
+}
+```
+
+---
+
+## 🗺️ API Reference
+
+### Auth — `/api/auth`
+
+| Method | Endpoint | Auth | Description |
+|--------|----------|------|-------------|
+| POST | `/register` | — | Create citizen account |
+| POST | `/login` | — | Returns JWT token |
+| GET | `/me` | 🔒 User | Current user profile |
+| PATCH | `/promote` | 🔑 L2+ | Promote user to admin |
+| PATCH | `/demote` | 🔑 L2+ | Demote admin to citizen |
+| GET | `/admins` | 🔑 L1+ | List all admins |
+
+### Issues — `/api/issues`
+
+| Method | Endpoint | Auth | Description |
+|--------|----------|------|-------------|
+| GET | `/` | — | All issues — filter + paginate |
+| GET | `/:id` | — | Single issue (full details) |
+| POST | `/` | 🔒 User | Create issue |
+| PATCH | `/:id/status` | 🔑 L1+ | Update status + add comment |
+| PATCH | `/:id/assign` | 🔑 L1+ | Assign to admin |
+| PATCH | `/:id/priority` | 🔑 L1+ | Manual priority override |
+| POST | `/:id/escalate` | 🔑 L1+ | Escalate with reason |
+| POST | `/:id/upvote` | 🔒 User | Toggle upvote (auto-upgrades priority) |
+| POST | `/:id/comment` | 🔒 User | Add comment |
+| DELETE | `/:id` | 🔑 L2+ | Delete issue |
+| DELETE | `/` | 🔑 L2+ | Delete all issues |
+
+**Filter params for `GET /api/issues`:**
+```
+?category=Roads & Potholes   # any of the 15 categories
+&status=Pending               # Pending | In Progress | Resolved | Escalated
+&priority=High                # Low | Medium | High | Critical
+&level=1                      # 1 | 2 | 3
+&page=1
+&limit=20
+```
+
+---
+
+## 🔺 Auto-Escalation Logic
+
+```
+Issue created
+  → currentLevel: 1 (Ward)
+  → priority: Low
+
+Community upvotes:
+  10 votes  → priority: Medium  (idle threshold × 1.0 multiplier)
+  25 votes  → priority: High    (idle threshold × 0.75 — escalates faster)
+  50 votes  → priority: Critical (idle threshold × 0.5 — escalates fastest)
+
+Escalation cron (runs every 60 min):
+  L1 idle 48h  → currentLevel: 2, status: Escalated, assignedTo: null
+  L2 idle 72h  → currentLevel: 3, status: Escalated, assignedTo: null
+  L3           → no further escalation — City Admin must act
+```
+
+All thresholds are configurable in `Backend/.env`.
+
+---
+
+## 🌐 Environment Variables
+
+### `Backend/.env`
+```env
+PORT=5000
+NODE_ENV=development
+MONGO_URI=mongodb+srv://...
+JWT_SECRET=your_secret_min_32_chars
+JWT_EXPIRES_IN=7d
+CLIENT_URL=http://localhost:5173
+ESCALATE_L1_HOURS=48
+ESCALATE_L2_HOURS=72
+ESCALATION_CRON_MINUTES=60
+```
+
+### `Frontend/.env`
+```env
+# Development — Vite proxy handles routing, relative URL works everywhere
+VITE_API_URL=/api
+
+# Production — set this in the Vercel dashboard instead of committing it
+# VITE_API_URL=https://civic-connect-4w0n.onrender.com/api
+```
+
+---
+
+## 🤝 Contributing
+
+1. Fork the repo
+2. Create a feature branch: `git checkout -b feature/your-feature`
+3. Commit: `git commit -m 'feat: add your feature'`
+4. Push: `git push origin feature/your-feature`
+5. Open a Pull Request
+
+---
+
+## 📄 License
+
+MIT — free to use for learning, portfolio, or production.
+
+---
+
+<div align="center">
+
+Built with ❤️ using the MERN stack · Deployed on Vercel + Render
+
+**[🚀 Try the live demo](https://civic-connect-ochre.vercel.app)**
+
+</div>

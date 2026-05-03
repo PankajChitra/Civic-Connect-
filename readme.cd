@@ -1,12 +1,7 @@
-<div align="center">
-
 # 🏘️ CivicConnect
 
 **A community-powered civic issue tracker that connects citizens with local authorities through a transparent, accountable, and escalating governance pipeline.**
 
-![Homepage](screenshots/homepage.png)
-![Issues](screenshots/issues.png)
-![Admin](screenshots/admin.png)
 
 [🚀 Live Demo](https://civic-connect-ochre.vercel.app) &nbsp;·&nbsp;
 [🔌 API](https://civic-connect-4w0n.onrender.com) &nbsp;·&nbsp;
@@ -15,7 +10,6 @@
 [⚡ Quick Start](#-quick-start) &nbsp;·&nbsp;
 [🗺️ API Reference](#️-api-reference)
 
-</div>
 
 ---
 

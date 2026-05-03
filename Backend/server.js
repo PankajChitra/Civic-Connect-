@@ -11,15 +11,23 @@ const { startEscalationCron } = require("./services/escalationService");
 
 const app = express();
 
+const allowedOrigins = [
+  "http://localhost:5173",
+  "https://civic-connect-ochre.vercel.app"
+];
+
 app.use(cors({
-  origin: [
-    "http://localhost:5173",
-    "https://civic-connect-ochre.vercel.app/"
-  ],
-  methods: ["GET", "POST", "PUT", "DELETE"],
+  origin: function (origin, callback) {
+    if (!origin || allowedOrigins.includes(origin)) {
+      callback(null, true);
+    } else {
+      callback(new Error("CORS not allowed"));
+    }
+  },
   credentials: true
 }));
-app.options('*', cors());
+
+app.options("*", cors());
 app.use(express.json({ limit: "20mb" }));
 app.use(express.urlencoded({ extended: true, limit: "20mb" }));
 
